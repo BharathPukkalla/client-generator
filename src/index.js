@@ -4,13 +4,14 @@ import "isomorphic-fetch";
 import program from "commander";
 import parseHydraDocumentation from "@api-platform/api-doc-parser/lib/hydra/parseHydraDocumentation";
 import parseSwaggerDocumentation from "@api-platform/api-doc-parser/lib/swagger/parseSwaggerDocumentation";
+import parseOpenApi3Documentation from "@api-platform/api-doc-parser/lib/openapi3/parseOpenApi3Documentation";
 import { version } from "../package.json";
 import generators from "./generators";
 
 program
   .version(version)
   .description(
-    "Generate a CRUD application built with React, Redux and React Router from an Hydra-enabled API"
+    "Generate apps built with Next, Nuxt, Quasar, React, React Native, Vue or Vuetify for any API documented using Hydra or OpenAPI"
   )
   .usage("entrypoint outputDirectory")
   .option(
@@ -22,17 +23,24 @@ program
     "The hydra prefix used by the API",
     "hydra:"
   )
+  .option("--username [username]", "Username for basic auth (Hydra only)")
+  .option("--password [password]", "Password for basic auth (Hydra only)")
+  .option("--bearer [bearer]", "Token for bearer auth (Hydra only)")
   .option(
     "-g, --generator [generator]",
-    'The generator to use, one of "react", "react-native", "vue", "admin-on-rest", "typescript", "next"',
-    "react"
+    'The generator to use, one of "next", "nuxt", "quasar", "react", "react-native", "typescript", "vue", "vuetify"',
+    "next"
   )
   .option(
     "-t, --template-directory [templateDirectory]",
     "The templates directory base to use. Final directory will be ${templateDirectory}/${generator}",
     `${__dirname}/../templates/`
   )
-  .option("-f, --format [hydra|swagger]", '"hydra" or "swagger', "hydra")
+  .option(
+    "-f, --format [hydra|openapi3|openapi2]",
+    '"hydra", "openapi3" or "openapi2"',
+    "hydra"
+  )
   .option(
     "-s, --server-path [serverPath]",
     "Path to express server file to allow route dynamic addition (Next.js generator only)"
@@ -58,30 +66,45 @@ const entrypointWithSlash = entrypoint.endsWith("/")
 
 const generator = generators(program.generator)({
   hydraPrefix: program.hydraPrefix,
-  templateDirectory: program.templateDirectory
+  templateDirectory: program.templateDirectory,
 });
 const resourceToGenerate = program.resource
   ? program.resource.toLowerCase()
   : null;
 const serverPath = program.serverPath ? program.serverPath.toLowerCase() : null;
 
-const parser = entrypointWithSlash => {
-  const parseDocumentation =
-    "swagger" === program.format
-      ? parseSwaggerDocumentation
-      : parseHydraDocumentation;
-
-  return parseDocumentation(entrypointWithSlash);
+const parser = (entrypointWithSlash) => {
+  const options = {};
+  if (program.username && program.password) {
+    const encoded = Buffer.from(
+      `${program.username}:${program.password}`
+    ).toString("base64");
+    options.headers = new Headers();
+    options.headers.set("Authorization", `Basic ${encoded}`);
+  }
+  if (program.bearer) {
+    options.headers = new Headers();
+    options.headers.set("Authorization", `Bearer ${program.bearer}`);
+  }
+  switch (program.format) {
+    case "swagger": // deprecated
+    case "openapi2":
+      return parseSwaggerDocumentation(entrypointWithSlash);
+    case "openapi3":
+      return parseOpenApi3Documentation(entrypointWithSlash);
+    default:
+      return parseHydraDocumentation(entrypointWithSlash, options);
+  }
 };
 
 // check generator dependencies
 generator.checkDependencies(outputDirectory, serverPath);
 
 parser(entrypointWithSlash)
-  .then(ret => {
+  .then((ret) => {
     ret.api.resources
       .filter(({ deprecated }) => !deprecated)
-      .filter(resource => {
+      .filter((resource) => {
         const nameLc = resource.name.toLowerCase();
         const titleLc = resource.title.toLowerCase();
 
@@ -91,8 +114,8 @@ parser(entrypointWithSlash)
           titleLc === resourceToGenerate
         );
       })
-      .map(resource => {
-        const filterDeprecated = list =>
+      .map((resource) => {
+        const filterDeprecated = (list) =>
           list.filter(({ deprecated }) => !deprecated);
 
         resource.fields = filterDeprecated(resource.fields);
@@ -104,8 +127,8 @@ parser(entrypointWithSlash)
         return resource;
       })
       // display helps after all resources have been generated to check relation dependency for example
-      .forEach(resource => generator.help(resource, outputDirectory));
+      .forEach((resource) => generator.help(resource, outputDirectory));
   })
-  .catch(e => {
+  .catch((e) => {
     console.log(e);
   });

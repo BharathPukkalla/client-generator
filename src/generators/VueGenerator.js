@@ -9,27 +9,22 @@ export default class extends BaseGenerator {
       // modules
       "store/modules/foo/index.js",
       "store/modules/foo/create/actions.js",
-      "store/modules/foo/create/getters.js",
       "store/modules/foo/create/index.js",
       "store/modules/foo/create/mutation_types.js",
       "store/modules/foo/create/mutations.js",
       "store/modules/foo/delete/actions.js",
-      "store/modules/foo/delete/getters.js",
       "store/modules/foo/delete/index.js",
       "store/modules/foo/delete/mutation_types.js",
       "store/modules/foo/delete/mutations.js",
       "store/modules/foo/list/actions.js",
-      "store/modules/foo/list/getters.js",
       "store/modules/foo/list/index.js",
       "store/modules/foo/list/mutation_types.js",
       "store/modules/foo/list/mutations.js",
       "store/modules/foo/show/actions.js",
-      "store/modules/foo/show/getters.js",
       "store/modules/foo/show/index.js",
       "store/modules/foo/show/mutation_types.js",
       "store/modules/foo/show/mutations.js",
       "store/modules/foo/update/actions.js",
-      "store/modules/foo/update/getters.js",
       "store/modules/foo/update/index.js",
       "store/modules/foo/update/mutation_types.js",
       "store/modules/foo/update/mutations.js",
@@ -48,7 +43,7 @@ export default class extends BaseGenerator {
       "error/SubmissionError.js",
 
       // utils
-      "utils/fetch.js"
+      "utils/fetch.js",
     ]);
   }
 
@@ -101,7 +96,7 @@ export const store = new Vuex.Store({
       fields: resource.readableFields,
       formFields: this.buildFields(resource.writableFields),
       hydraPrefix: this.hydraPrefix,
-      titleUcFirst
+      titleUcFirst,
     };
 
     // Create directories
@@ -110,7 +105,7 @@ export const store = new Vuex.Store({
       `${dir}/config`,
       `${dir}/error`,
       `${dir}/router`,
-      `${dir}/utils`
+      `${dir}/utils`,
     ]) {
       this.createDir(dir, false);
     }
@@ -122,7 +117,7 @@ export const store = new Vuex.Store({
       `${dir}/store/modules/${lc}/list`,
       `${dir}/store/modules/${lc}/show`,
       `${dir}/store/modules/${lc}/update`,
-      `${dir}/components/${lc}`
+      `${dir}/components/${lc}`,
     ]) {
       this.createDir(dir);
     }
@@ -131,27 +126,22 @@ export const store = new Vuex.Store({
       // modules
       "store/modules/%s/index.js",
       "store/modules/%s/create/actions.js",
-      "store/modules/%s/create/getters.js",
       "store/modules/%s/create/index.js",
       "store/modules/%s/create/mutation_types.js",
       "store/modules/%s/create/mutations.js",
       "store/modules/%s/delete/actions.js",
-      "store/modules/%s/delete/getters.js",
       "store/modules/%s/delete/index.js",
       "store/modules/%s/delete/mutation_types.js",
       "store/modules/%s/delete/mutations.js",
       "store/modules/%s/list/actions.js",
-      "store/modules/%s/list/getters.js",
       "store/modules/%s/list/index.js",
       "store/modules/%s/list/mutation_types.js",
       "store/modules/%s/list/mutations.js",
       "store/modules/%s/show/actions.js",
-      "store/modules/%s/show/getters.js",
       "store/modules/%s/show/index.js",
       "store/modules/%s/show/mutation_types.js",
       "store/modules/%s/show/mutations.js",
       "store/modules/%s/update/actions.js",
-      "store/modules/%s/update/getters.js",
       "store/modules/%s/update/index.js",
       "store/modules/%s/update/mutation_types.js",
       "store/modules/%s/update/mutations.js",
@@ -164,7 +154,7 @@ export const store = new Vuex.Store({
       "components/%s/Show.vue",
 
       // routes
-      "router/%s.js"
+      "router/%s.js",
     ]) {
       this.createFileFromPattern(pattern, dir, lc, context);
     }

@@ -1,7 +1,5 @@
 import chalk from "chalk";
-import fs from "fs";
 import BaseGenerator from "./BaseGenerator";
-import { parse, print, types } from "recast";
 
 export default class NextGenerator extends BaseGenerator {
   constructor(params) {
@@ -12,97 +10,35 @@ export default class NextGenerator extends BaseGenerator {
       // components
       "components/common/ReferenceLinks.tsx",
       "components/foo/List.tsx",
-      "components/foo/ListItem.tsx",
       "components/foo/Show.tsx",
+      "components/foo/Form.tsx",
 
       // interfaces
       "error/SubmissionError.ts",
 
-      // interfaces
-      "interfaces/Collection.ts",
-      "interfaces/foo.ts",
+      // types
+      "types/Collection.ts",
+      "types/foo.ts",
 
       // pages
-      "pages/foo.tsx",
-      "pages/foos.tsx",
+      "pages/foos/[id]/index.tsx",
+      "pages/foos/[id]/edit.tsx",
+      "pages/foos/index.tsx",
+      "pages/foos/create.tsx",
 
       // utils
-      "utils/dataAccess.ts"
+      "utils/dataAccess.ts",
     ]);
   }
 
-  checkDependencies(dir, serverPath) {
-    const dependencies = this.getTargetDependencies(dir);
-
-    if (!dependencies.length) {
-      return;
-    }
-
-    if (!dependencies.includes("@zeit/next-typescript")) {
-      console.log(
-        chalk.yellow(
-          "It seems next-typescript is not installed but generator needs typescript to work efficiently."
-        )
-      );
-    }
-
-    if (!dependencies.includes("express")) {
-      console.log(
-        chalk.yellow(
-          "It seems express is not installed but generator needs a custom express server to work efficiently."
-        )
-      );
-    }
-
-    if (serverPath) {
-      if (!fs.existsSync(serverPath)) {
-        console.log(chalk.red("Express server file doesn't exists."));
-        return;
-      }
-
-      const { mode } = fs.statSync(serverPath);
-      if ("200" !== (mode & parseInt("200", 8)).toString(8)) {
-        console.log(chalk.red("Express server file is not writable."));
-      }
-    }
-  }
-
-  checkImports(directory, imports, extension = ".ts") {
-    imports.forEach(({ file }) => {
-      if (fs.existsSync(directory + file + extension)) {
-        return;
-      }
-
-      console.log(
-        chalk.yellow(
-          'An import for the file  "%s" has been generated but the file doesn\'t exists.'
-        ),
-        file
-      );
-    });
-  }
-
-  help(resource, dir) {
+  help(resource) {
     console.log(
       chalk.green('Code for the "%s" resource type has been generated!'),
       resource.title
     );
-
-    // missing import
-    const { imports } = this.parseFields(resource);
-    this.checkImports(`${dir}/interfaces/`, imports);
-
-    // server route configuration
-    if (!this.routeAddedtoServer) {
-      const lc = resource.title.toLowerCase();
-      console.log(
-        "Paste the following route to your server configuration file:"
-      );
-      console.log(chalk.green(this.getShowRoute(lc)));
-    }
   }
 
-  generate(api, resource, dir, serverPath) {
+  generate(api, resource, dir) {
     const lc = resource.title.toLowerCase();
     const ucf = this.ucFirst(resource.title);
     const { fields, imports } = this.parseFields(resource);
@@ -113,10 +49,10 @@ export default class NextGenerator extends BaseGenerator {
       uc: resource.title.toUpperCase(),
       ucf,
       fields,
-      formFields: this.buildFields(resource.writableFields),
+      formFields: this.buildFields(fields),
       imports,
       hydraPrefix: this.hydraPrefix,
-      title: resource.title
+      title: resource.title,
     };
 
     // Create directories
@@ -125,32 +61,31 @@ export default class NextGenerator extends BaseGenerator {
       `${dir}/components/common`,
       `${dir}/config`,
       `${dir}/error`,
-      `${dir}/interfaces`,
-      `${dir}/pages`,
-      `${dir}/utils`
-    ].forEach(dir => this.createDir(dir, false));
+      `${dir}/types`,
+      `${dir}/utils`,
+    ].forEach((dir) => this.createDir(dir, false));
 
-    // copy with patterned name
+    // Copy with patterned name
     this.createDir(`${dir}/components/${context.lc}`);
+    this.createDir(`${dir}/pages/${context.lc}s`);
+    this.createDir(`${dir}/pages/${context.lc}s/[id]`);
     [
       // components
       "components/%s/List.tsx",
-      "components/%s/ListItem.tsx",
       "components/%s/Show.tsx",
+      "components/%s/Form.tsx",
 
       // pages
-      "pages/%s.tsx",
-      "pages/%ss.tsx"
-    ].forEach(pattern =>
+      "pages/%ss/[id]/index.tsx",
+      "pages/%ss/[id]/edit.tsx",
+      "pages/%ss/index.tsx",
+      "pages/%ss/create.tsx",
+    ].forEach((pattern) =>
       this.createFileFromPattern(pattern, dir, context.lc, context)
     );
 
     // interface pattern should be camel cased
-    this.createFile(
-      "interfaces/foo.ts",
-      `${dir}/interfaces/${context.ucf}.ts`,
-      context
-    );
+    this.createFile("types/foo.ts", `${dir}/types/${context.ucf}.ts`, context);
 
     // copy with regular name
     [
@@ -160,57 +95,17 @@ export default class NextGenerator extends BaseGenerator {
       // error
       "error/SubmissionError.ts",
 
-      // interfaces
-      "interfaces/Collection.ts",
+      // types
+      "types/Collection.ts",
 
       // utils
-      "utils/dataAccess.ts"
-    ].forEach(file => this.createFile(file, `${dir}/${file}`, context, false));
+      "utils/dataAccess.ts",
+    ].forEach((file) =>
+      this.createFile(file, `${dir}/${file}`, context, false)
+    );
 
     // API config
     this.createEntrypoint(api.entrypoint, `${dir}/config/entrypoint.ts`);
-
-    if (serverPath) {
-      this.createExpressRoute(serverPath, lc, this.getShowRoute(lc));
-    }
-  }
-
-  getShowRoute(name) {
-    return `server.get('/${name}/:id', (req, res) => {
-  return app.render(req, res, '/${name}', { id: req.params.id })
-});`;
-  }
-
-  createExpressRoute(path, resourceName, toInsert) {
-    const content = fs.readFileSync(path, "utf-8");
-    const code = parse(content);
-    const { namedTypes } = types;
-
-    types.visit(code, {
-      visitExpressionStatement: function(path) {
-        const args = path.value.expression.arguments;
-        if (
-          2 === args.length &&
-          namedTypes.Literal.check(args[0]) &&
-          "*" === args[0].value &&
-          namedTypes.ArrowFunctionExpression.check(args[1])
-        ) {
-          // insert route before "*" route
-          path.parent.value.body.splice(path.name, 0, toInsert);
-
-          return false;
-        }
-
-        this.traverse(path);
-      }
-    });
-
-    fs.writeFileSync(path, print(code).code);
-    console.log(
-      chalk.green("'Show' route for %s has been added to your server"),
-      resourceName
-    );
-    this.routeAddedtoServer = true;
   }
 
   getDescription(field) {
@@ -220,7 +115,7 @@ export default class NextGenerator extends BaseGenerator {
   parseFields(resource) {
     const fields = [
       ...resource.writableFields,
-      ...resource.readableFields
+      ...resource.readableFields,
     ].reduce((list, field) => {
       if (list[field.name]) {
         return list;
@@ -234,8 +129,8 @@ export default class NextGenerator extends BaseGenerator {
           type: this.getType(field),
           description: this.getDescription(field),
           readonly: false,
-          reference: field.reference
-        }
+          reference: field.reference,
+        },
       };
     }, {});
 
@@ -251,8 +146,8 @@ export default class NextGenerator extends BaseGenerator {
           ...list,
           [type]: {
             type,
-            file: `./${type}`
-          }
+            file: `./${type}`,
+          },
         };
       },
       {}

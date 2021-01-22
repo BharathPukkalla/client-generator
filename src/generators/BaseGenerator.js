@@ -3,6 +3,7 @@ import fs from "fs";
 import handlebars from "handlebars";
 import mkdirp from "mkdirp";
 import { sprintf } from "sprintf-js";
+import prettier from "prettier";
 
 export default class {
   templates = {};
@@ -45,8 +46,24 @@ export default class {
   }
 
   createFile(template, dest, context = {}, warn = true) {
+    if (undefined === this.templates[template]) {
+      console.log(
+        `The template ${template} does not exists in the registered templates.`
+      );
+
+      return;
+    }
+
+    // Format the generated code using Prettier
+    let content = this.templates[template](context);
+    if (template.endsWith(".js")) {
+      content = prettier.format(content, { parser: "babel" });
+    } else if (template.endsWith(".ts") || template.endsWith(".tsx")) {
+      content = prettier.format(content, { parser: "babel-ts" });
+    }
+
     if (!fs.existsSync(dest)) {
-      fs.writeFileSync(dest, this.templates[template](context));
+      fs.writeFileSync(dest, content);
 
       return;
     }
@@ -73,7 +90,7 @@ export default class {
       const configuration = JSON.parse(packageFile.toString());
       dependencies = Object.keys({
         ...configuration.dependencies,
-        ...configuration.devDependencies
+        ...configuration.devDependencies,
       });
     } catch (e) {
       console.log(
@@ -121,7 +138,11 @@ export default class {
 
   getType(field) {
     if (field.reference) {
-      return field.reference.title;
+      if (field.maxCardinality !== 1) {
+        return "string[]";
+      }
+
+      return "string";
     }
 
     switch (field.range) {
@@ -142,10 +163,10 @@ export default class {
   }
 
   buildFields(fields) {
-    return fields.map(field => ({
+    return fields.map((field) => ({
       ...field,
       ...this.getHtmlInputTypeFromField(field),
-      description: field.description.replace(/"/g, "'") // fix for Form placeholder description
+      description: field.description.replace(/"/g, "'"), // fix for Form placeholder description
     }));
   }
 }
